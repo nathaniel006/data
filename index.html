@@ -6,17 +6,30 @@
 <title>Search UI</title>
 
 <style>
-  body {
-    margin: 0;
-    padding: 0;
-    background: #4a4a4a;
-    font-family: Arial, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    overflow: hidden;
-  }
+  html, body {
+  scrollbar-width: none;  /* Firefox */
+}
+
+body::-webkit-scrollbar,
+html::-webkit-scrollbar {
+  display: none; /* Chrome, Edge, Safari */
+}
+body {
+  margin: 0;
+  padding: 0;
+  background: #4a4a4a;
+  font-family: Arial, sans-serif;
+
+  display: flex;
+  justify-content: center;
+
+  /* KEY FIX */
+  align-items: flex-start;
+
+  min-height: 100vh;
+  overflow-y: auto;
+  padding-top: 60px;
+}
 
   /* ------------------------------
      HAMBURGER ICON (Animated)
@@ -148,7 +161,7 @@
     background: #3a3a3a;
   }
 
-  /* CLEAR BUTTON (inside search bar) */
+/* CLEAR BUTTON (simple X, matches nav style theme) */
 .clear-btn {
   position: absolute;
   top: 50%;
@@ -156,12 +169,10 @@
   transform: translateY(-60%);
   width: 22px;
   height: 22px;
-  border-radius: 50%;
   border: none;
-  background: #666;
-  color: white;
-  font-size: 14px;
+  background: transparent;
   cursor: pointer;
+
   opacity: 0;
   pointer-events: none;
   transition: 0.2s ease;
@@ -172,9 +183,24 @@
   pointer-events: auto;
 }
 
-  .clear-btn:hover {
-    background: #777;
-  }
+/* X shape */
+.clear-btn span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 3px;
+  background: white;
+  border-radius: 3px;
+}
+
+.clear-btn span:nth-child(1) {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.clear-btn span:nth-child(2) {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
 
   .results-box {
     background: #2f2f2f;
@@ -199,7 +225,13 @@
     background: #3a3a3a;
     border-left: 5px solid #666;
     border-radius: 6px;
-    transition: 0.3s ease;
+    transition: 0.5s ease;
+    border-top: 1px solid transparent;
+    border-right: 1px solid transparent;
+    border-bottom: 1px solid transparent;
+
+    box-sizing: border-box;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
 
   .result-item:hover {
@@ -221,7 +253,37 @@
     from { opacity: 0; transform: translateY(-6px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+  .details-panel {
+  margin-top: 12px;
+  background: #1f1f1f;
+  border: 1px solid white;
+  border-radius: 8px;
+  padding: 12px;
+  color: white;
+  text-align: left;
+  animation: slideDown 0.25s ease;
+}
 
+.hidden {
+  display: none;
+}
+
+.details-panel strong {
+  display: block;
+  margin-bottom: 6px;
+}
+.result-item.selected {
+  background: #454545;
+  border-top: 1px solid white;
+  border-bottom: 1px solid white;
+  border-right: 1px solid white;
+  border-left: 5px solid #3b82f6; /* blue */
+}
+.menu-item {
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
 </style>
 </head>
 
@@ -251,14 +313,21 @@
  <div class="search-box">
   <div class="search-wrapper">
     <input id="searchInput" class="search-input" type="text" placeholder="ex: leading edge panel...">
-    <button id="clearBtn" class="clear-btn">✕</button>
+    <button id="clearBtn" class="clear-btn" aria-label="Clear search">
+  <span></span>
+  <span></span>
+</button>
   </div>
 </div>
 
 
-    <div id="results" class="results-box">
-      <em>Searched items appear here...</em>
-    </div>
+<div id="results" class="results-box">
+  <em>Searched items appear here...</em>
+</div>
+
+<div id="detailsPanel" class="details-panel hidden">
+  <em>Select an item to view details</em>
+</div>
   </div>
 
 <script>
@@ -266,6 +335,8 @@
     const menu = document.getElementById("sideMenu");
     const overlay = document.getElementById("menuOverlay");
     const icon = document.getElementById("navIcon");
+
+    let selectedItem = null;
 
     menu.classList.toggle("open");
     overlay.classList.toggle("open");
@@ -324,40 +395,41 @@
       div.className = "result-item";
       div.textContent = item.name;
 
-      div.addEventListener("click", () => {
-        if (openDetails === wrapper) {
-          wrapper.removeChild(wrapper.lastChild);
-          openDetails = null;
-          return;
-        }
+div.addEventListener("click", () => {
+  const panel = document.getElementById("detailsPanel");
 
-        if (openDetails) {
-          openDetails.removeChild(openDetails.lastChild);
-        }
+  panel.classList.remove("hidden");
 
-        const details = document.createElement("div");
-        details.className = "details";
-        details.innerHTML = `
-          <strong>${item.name}</strong><br>
-          ${item.info}
-        `;
+  panel.innerHTML = `
+    <strong>${item.name}</strong><br>
+    ${item.info}
+  `;
 
-        wrapper.appendChild(details);
-        openDetails = wrapper;
-      });
+  // remove previous selection (safer query approach)
+  document.querySelectorAll(".result-item.selected")
+    .forEach(el => el.classList.remove("selected"));
 
+  // apply new selection
+  div.classList.add("selected");
+});
       wrapper.appendChild(div);
       resultsBox.appendChild(wrapper);
     });
   });
 
-  clearBtn.addEventListener("click", () => {
-    input.value = "";
-    clearBtn.classList.remove("show");
-    resultsBox.innerHTML = "<em>Searched items appear here...</em>";
-    input.focus();
-    openDetails = null;
-  });
+clearBtn.addEventListener("click", () => {
+  input.value = "";
+  clearBtn.classList.remove("show");
+
+  resultsBox.innerHTML = "<em>Searched items appear here...</em>";
+
+  const panel = document.getElementById("detailsPanel");
+  panel.classList.add("hidden");
+  panel.innerHTML = "<em>Select an item to view details</em>";
+
+  input.focus();
+  openDetails = null;
+});
 </script>
 
 </body>
